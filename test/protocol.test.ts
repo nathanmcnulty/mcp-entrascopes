@@ -19,6 +19,7 @@ const fixture: EntraApplication = {
     {
       resourceId: "00000003-0000-0000-c000-000000000000",
       resourceName: "Microsoft Graph",
+      resourceAliases: ["https://graph.microsoft.com"],
       scopes: ["User.Read"],
     },
   ],
@@ -52,6 +53,15 @@ test("lists and calls tools through MCP", async () => {
     assert.equal(response.isError, undefined);
     assert.equal(
       (response.structuredContent as { totalMatches?: number } | undefined)?.totalMatches,
+      1,
+    );
+
+    const uriResponse = await client.callTool({
+      name: "search_entra_applications",
+      arguments: { resource: "graph.microsoft.com" },
+    });
+    assert.equal(
+      (uriResponse.structuredContent as { totalMatches?: number } | undefined)?.totalMatches,
       1,
     );
   } finally {

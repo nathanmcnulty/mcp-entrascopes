@@ -37,10 +37,10 @@ export function createServer(
   provider: Pick<EntraScopesDataProvider, "getSnapshot"> = new EntraScopesDataProvider(),
 ): McpServer {
   const server = new McpServer(
-    { name: "mcp-entrascopes", version: "0.1.0" },
+    { name: "mcp-entrascopes", version: "0.2.0" },
     {
       instructions:
-        "Use this read-only server to inspect published Microsoft first-party application scope metadata. Results describe upstream metadata, not a tenant's service principals, grants, or proof of consent. Use get_entra_application for an exact app ID. Use search_entra_applications for app names, scope names, resource names, or IDs. Keep limits small and cite the returned provenance when the distinction matters.",
+        "Use this read-only server to inspect published Microsoft first-party application scope metadata. Results describe upstream delegated-scope metadata, not app roles, tenant grants, or proof of consent. Use get_entra_application for an exact app ID and page large results. Use search_entra_applications for app names, scopes, resource names, IDs, or known API URIs. Cite returned provenance when the distinction matters.",
     },
   );
 
@@ -49,7 +49,7 @@ export function createServer(
     {
       title: "Search Entra applications and scopes",
       description:
-        "Search Microsoft first-party applications by app name/ID, published scope, resource name/ID, FOCI status, or public-client status. This is not tenant consent state.",
+        "Search Microsoft first-party applications by app name/ID, published delegated scope, resource name/ID/API URI, reply URI, FOCI status, or public-client status. This is not tenant consent state.",
       inputSchema: z.object({
         query: z.string().min(1).optional().describe("Partial application name or app ID."),
         scope: z.string().min(1).optional().describe("OAuth scope name to match."),
@@ -57,15 +57,17 @@ export function createServer(
           .string()
           .min(1)
           .optional()
-          .describe("Partial resource display name or resource app ID."),
+          .describe("Partial resource display name, resource app ID, or known API URI."),
+        redirect_uri: z.string().min(1).optional().describe("Partial reply/redirect URI."),
         scope_match: z.enum(["exact", "contains"]).default("exact"),
         foci: z.boolean().optional().describe("Filter family-of-client-IDs applications."),
         public_client: z.boolean().optional().describe("Filter public client applications."),
+        offset: z.number().int().min(0).default(0),
         limit: z.number().int().min(1).max(50).default(20),
       }),
       annotations: readOnlyAnnotations,
     },
-    async ({ query, scope, resource, scope_match, foci, public_client, limit }) => {
+    async ({ query, scope, resource, redirect_uri, scope_match, foci, public_client, offset, limit }) => {
       try {
         const snapshot = await provider.getSnapshot();
         return result(
@@ -73,9 +75,11 @@ export function createServer(
             ...(query === undefined ? {} : { query }),
             ...(scope === undefined ? {} : { scope }),
             ...(resource === undefined ? {} : { resource }),
+            ...(redirect_uri === undefined ? {} : { redirectUri: redirect_uri }),
             scopeMatch: scope_match,
             ...(foci === undefined ? {} : { foci }),
             ...(public_client === undefined ? {} : { publicClient: public_client }),
+            offset,
             limit,
           }),
         );
@@ -90,26 +94,36 @@ export function createServer(
     {
       title: "Get an Entra application",
       description:
-        "Get published scope metadata for one exact Microsoft first-party application ID, optionally narrowed to a resource.",
+        "Get paginated published scope metadata for one exact Microsoft first-party application ID, optionally filtered by resource name/ID/API URI and scope.",
       inputSchema: z.object({
         app_id: guidSchema.describe("Exact application (client) ID."),
         resource: z
           .string()
           .min(1)
           .optional()
-          .describe("Optional resource display name or resource app ID filter."),
+          .describe("Optional resource display name, resource app ID, or known API URI filter."),
+        scope: z.string().min(1).optional().describe("Optional OAuth scope filter."),
+        scope_match: z.enum(["exact", "contains"]).default("exact"),
         include_redirect_uris: z.boolean().default(false),
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(25),
       }),
       annotations: readOnlyAnnotations,
     },
-    async ({ app_id, resource, include_redirect_uris }) => {
+    async ({ app_id, resource, scope, scope_match, include_redirect_uris, offset, limit }) => {
       try {
         const snapshot = await provider.getSnapshot();
         const application = getApplication(
           snapshot,
           app_id,
-          resource,
-          include_redirect_uris,
+          {
+            ...(resource === undefined ? {} : { resource }),
+            ...(scope === undefined ? {} : { scope }),
+            scopeMatch: scope_match,
+            includeRedirectUris: include_redirect_uris,
+            offset,
+            limit,
+          },
         );
         if (!application) {
           return failure(`No application found for app ID ${app_id}.`);

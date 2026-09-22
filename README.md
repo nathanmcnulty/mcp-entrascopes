@@ -8,6 +8,7 @@ It is designed for questions such as:
 
 - Which Microsoft first-party applications publish `Application.Read.All` for Microsoft Graph?
 - What scopes are associated with a known application (client) ID?
+- Which applications publish a particular reply/redirect URI or target a known API URI?
 - Is an application marked as a public client or a member of a family of client IDs (FOCI)?
 
 > [!IMPORTANT]
@@ -21,11 +22,15 @@ The primary dataset is several megabytes and changes over time. A skill would ei
 
 | Tool | Purpose |
 | --- | --- |
-| `search_entra_applications` | Search by application name/ID, scope, resource name/ID, FOCI status, or public-client status. |
-| `get_entra_application` | Return published scope metadata for one exact application ID. |
+| `search_entra_applications` | Search by application name/ID, delegated scope, resource name/ID/API URI, reply URI, FOCI status, or public-client status. |
+| `get_entra_application` | Return filtered, paginated scope metadata for one exact application ID. |
 | `get_entrascopes_data_status` | Report source URLs, fetch time, cache state, and record counts; optionally refresh. |
 
-Search responses are capped at 50 applications. Exact scope matching is the default; use `scope_match: "contains"` only when discovery is intended.
+Search responses are capped at 50 applications and support `offset` pagination. Exact-application responses return 25 resource grants by default, can return up to 100, and also support `offset`. Exact scope matching is the default; use `scope_match: "contains"` only when discovery is intended. Full redirect-URI arrays are omitted unless `include_redirect_uris` is true.
+
+Resource matching understands display names, application IDs, identifier URIs supplied by the upstream data, and a small set of documented built-in aliases for Microsoft Graph, Azure Resource Manager, and Microsoft Defender for Endpoint. Aliases are lookup conveniences and do not assert the valid audience for every API version.
+
+The upstream `scopes` values are reported as delegated OAuth scope claims (`scp`). The server does not reinterpret them as application roles (`roles`) or claim that either permission type is currently valid; accuracy remains bounded by the published source data.
 
 ## Requirements
 

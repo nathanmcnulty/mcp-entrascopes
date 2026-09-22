@@ -15,11 +15,14 @@ export interface RawScopeDataset {
 export interface RawResource {
   resourceId: string;
   displayName: string;
+  identifierUris: string[];
+  aliases: string[];
 }
 
 export interface ResourceGrant {
   resourceId: string;
   resourceName: string | null;
+  resourceAliases: string[];
   scopes: string[];
 }
 

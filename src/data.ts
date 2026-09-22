@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { BUILT_IN_RESOURCE_ALIASES } from "./resource-aliases.js";
 import type {
   DataOrigin,
   DataSnapshot,
@@ -62,8 +63,17 @@ function parseResources(value: unknown): RawResource[] {
     ) {
       return [];
     }
-    return [{ resourceId: item.resourceId, displayName: item.displayName }];
+    return [{
+      resourceId: item.resourceId,
+      displayName: item.displayName,
+      identifierUris: stringArray(item.identifierUris ?? item.identifier_uris),
+      aliases: stringArray(item.aliases),
+    }];
   });
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 export function normalizeDatasets(
@@ -72,11 +82,21 @@ export function normalizeDatasets(
 ): EntraApplication[] {
   const scopeDataset = parseScopeDataset(scopesValue);
   const resources = parseResources(resourcesValue);
-  const resourceNames = new Map(
-    resources.map((resource) => [
-      resource.resourceId.toLowerCase(),
-      resource.displayName.trim(),
-    ]),
+  const resourceMetadata = new Map(
+    resources.map((resource) => {
+      const resourceId = resource.resourceId.toLowerCase();
+      return [
+        resourceId,
+        {
+          name: resource.displayName.trim(),
+          aliases: uniqueStrings([
+            ...resource.identifierUris,
+            ...resource.aliases,
+            ...(BUILT_IN_RESOURCE_ALIASES[resourceId] ?? []),
+          ]),
+        },
+      ];
+    }),
   );
 
   return Object.entries(scopeDataset.apps)
@@ -85,11 +105,18 @@ export function normalizeDatasets(
 
       const rawScopes = isRecord(rawApp.scopes) ? rawApp.scopes : {};
       const grants: ResourceGrant[] = Object.entries(rawScopes)
-        .map(([resourceId, scopes]) => ({
-          resourceId,
-          resourceName: resourceNames.get(resourceId.toLowerCase()) ?? null,
-          scopes: stringArray(scopes).sort((left, right) => left.localeCompare(right)),
-        }))
+        .map(([resourceId, scopes]) => {
+          const metadata = resourceMetadata.get(resourceId.toLowerCase());
+          return {
+            resourceId,
+            resourceName: metadata?.name ?? null,
+            resourceAliases: uniqueStrings([
+              ...(metadata?.aliases ?? []),
+              ...(BUILT_IN_RESOURCE_ALIASES[resourceId.toLowerCase()] ?? []),
+            ]),
+            scopes: stringArray(scopes).sort((left, right) => left.localeCompare(right)),
+          };
+        })
         .filter((grant) => grant.scopes.length > 0)
         .sort((left, right) =>
           (left.resourceName ?? left.resourceId).localeCompare(
@@ -199,7 +226,7 @@ export class EntraScopesDataProvider {
 
   private async fetchJson(url: string): Promise<unknown> {
     const response = await this.fetcher(url, {
-      headers: { "user-agent": "mcp-entrascopes/0.1.0" },
+      headers: { "user-agent": "mcp-entrascopes/0.2.0" },
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) {
