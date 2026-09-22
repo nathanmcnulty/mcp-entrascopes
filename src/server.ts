@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import { EntraScopesDataProvider } from "./data.js";
+import { compareScopeHistory } from "./history.js";
 import { dataSummary, getApplication, searchApplications } from "./query.js";
 
 const readOnlyAnnotations = {
@@ -17,6 +18,9 @@ const guidSchema = z
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     "Expected a GUID-formatted application ID.",
   );
+const shaSchema = z
+  .string()
+  .regex(/^[0-9a-f]{40}$/i, "Expected a full 40-character Git commit SHA.");
 
 function result(value: Record<string, unknown>) {
   return {
@@ -34,13 +38,76 @@ function failure(error: unknown) {
 }
 
 export function createServer(
-  provider: Pick<EntraScopesDataProvider, "getSnapshot"> = new EntraScopesDataProvider(),
+  provider: Pick<EntraScopesDataProvider, "getSnapshot" | "getScopeHistory"> =
+    new EntraScopesDataProvider(),
 ): McpServer {
   const server = new McpServer(
-    { name: "mcp-entrascopes", version: "0.2.0" },
+    { name: "mcp-entrascopes", version: "0.3.0" },
     {
       instructions:
-        "Use this read-only server to inspect published Microsoft first-party application scope metadata. Results describe upstream delegated-scope metadata, not app roles, tenant grants, or proof of consent. Use get_entra_application for an exact app ID and page large results. Use search_entra_applications for app names, scopes, resource names, IDs, or known API URIs. Cite returned provenance when the distinction matters.",
+        "Use this read-only server to inspect published Microsoft first-party application scope metadata. Results describe upstream delegated-scope metadata, not app roles, tenant grants, or proof of consent. Use search_entra_applications to find apps with a requested scope. Use compare_entrascopes_scope_history for additions and removals between immutable ROADtools revisions. Cite returned provenance when the distinction matters.",
+    },
+  );
+
+  server.registerTool(
+    "compare_entrascopes_scope_history",
+    {
+      title: "Compare historical Entra scope metadata",
+      description:
+        "Compare exact delegated-scope strings between immutable ROADtools revisions. Defaults to the latest two revisions that changed the scope dataset and supports bounded filters for agent reports.",
+      inputSchema: z.object({
+        base_ref: shaSchema.optional().describe("Optional older ROADtools commit SHA."),
+        head_ref: shaSchema.optional().describe("Optional newer ROADtools commit SHA."),
+        refresh: z.boolean().default(false).describe("Bypass cached history resolution."),
+        app_id: guidSchema.optional().describe("Filter one exact application ID."),
+        query: z.string().min(1).optional().describe("Partial application name or ID."),
+        resource: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Partial resource name, ID, or known API URI."),
+        scope: z.string().min(1).optional().describe("Scope value to filter."),
+        scope_match: z.enum(["exact", "contains"]).default("exact"),
+        change: z.enum(["added", "removed", "all"]).default("all"),
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(50),
+      }),
+      annotations: readOnlyAnnotations,
+    },
+    async ({
+      base_ref,
+      head_ref,
+      refresh,
+      app_id,
+      query,
+      resource,
+      scope,
+      scope_match,
+      change,
+      offset,
+      limit,
+    }) => {
+      try {
+        const history = await provider.getScopeHistory({
+          ...(base_ref === undefined ? {} : { baseRef: base_ref }),
+          ...(head_ref === undefined ? {} : { headRef: head_ref }),
+          refresh,
+        });
+        return result(
+          compareScopeHistory(history, {
+            ...(app_id === undefined ? {} : { appId: app_id }),
+            ...(query === undefined ? {} : { query }),
+            ...(resource === undefined ? {} : { resource }),
+            ...(scope === undefined ? {} : { scope }),
+            scopeMatch: scope_match,
+            change,
+            offset,
+            limit,
+          }),
+        );
+      } catch (error) {
+        return failure(error);
+      }
     },
   );
 

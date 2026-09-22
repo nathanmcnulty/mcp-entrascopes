@@ -28,6 +28,28 @@ const fixture: EntraApplication = {
 test("lists and calls tools through MCP", async () => {
   const server = createServer({
     getSnapshot: async () => createTestSnapshot([fixture]),
+    getScopeHistory: async () => ({
+      base: {
+        revision: {
+          sha: "a".repeat(40),
+          committedAt: "2026-09-20T00:00:00.000Z",
+          message: "before",
+          url: "https://example.test/before",
+          sourceUrl: "https://example.test/before.json",
+        },
+        snapshot: createTestSnapshot([]),
+      },
+      head: {
+        revision: {
+          sha: "b".repeat(40),
+          committedAt: "2026-09-21T00:00:00.000Z",
+          message: "after",
+          url: "https://example.test/after",
+          sourceUrl: "https://example.test/after.json",
+        },
+        snapshot: createTestSnapshot([fixture]),
+      },
+    }),
   });
   const client = new Client({ name: "mcp-entrascopes-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -40,6 +62,7 @@ test("lists and calls tools through MCP", async () => {
     assert.deepEqual(
       tools.tools.map((tool) => tool.name).sort(),
       [
+        "compare_entrascopes_scope_history",
         "get_entra_application",
         "get_entrascopes_data_status",
         "search_entra_applications",
@@ -53,6 +76,17 @@ test("lists and calls tools through MCP", async () => {
     assert.equal(response.isError, undefined);
     assert.equal(
       (response.structuredContent as { totalMatches?: number } | undefined)?.totalMatches,
+      1,
+    );
+
+    const historyResponse = await client.callTool({
+      name: "compare_entrascopes_scope_history",
+      arguments: { scope: "User.Read" },
+    });
+    assert.equal(historyResponse.isError, undefined);
+    assert.equal(
+      (historyResponse.structuredContent as { totalMatches?: number } | undefined)
+        ?.totalMatches,
       1,
     );
 

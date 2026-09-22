@@ -39,20 +39,24 @@ function normalizedResource(value: string): string {
   return trimmed.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
+export function resourceMatches(grant: ResourceGrant, resource: string | undefined): boolean {
+  return (
+    resource === undefined ||
+    includes(grant.resourceId, resource) ||
+    (grant.resourceName !== null && includes(grant.resourceName, resource)) ||
+    grant.resourceAliases.some((alias) =>
+      normalizedResource(alias).includes(normalizedResource(resource)),
+    )
+  );
+}
+
 function grantMatches(
   grant: ResourceGrant,
   scope: string | undefined,
   resource: string | undefined,
   scopeMatch: ScopeMatch,
 ): boolean {
-  const resourceMatches =
-    resource === undefined ||
-    includes(grant.resourceId, resource) ||
-    (grant.resourceName !== null && includes(grant.resourceName, resource)) ||
-    grant.resourceAliases.some((alias) =>
-      normalizedResource(alias).includes(normalizedResource(resource)),
-    );
-  if (!resourceMatches) return false;
+  if (!resourceMatches(grant, resource)) return false;
   if (scope === undefined) return true;
 
   const normalizedScope = scope.trim().toLowerCase();

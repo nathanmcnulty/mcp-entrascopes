@@ -48,3 +48,16 @@ export interface DataSnapshot {
   applicationCount: number;
   grantCount: number;
 }
+
+export interface ScopeRevision {
+  sha: string;
+  committedAt: string | null;
+  message: string | null;
+  url: string;
+  sourceUrl: string;
+}
+
+export interface ScopeHistory {
+  base: { revision: ScopeRevision; snapshot: DataSnapshot };
+  head: { revision: ScopeRevision; snapshot: DataSnapshot };
+}

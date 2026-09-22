@@ -1,6 +1,6 @@
 {
   "name": "mcp-entrascopes",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read-only MCP server for querying Microsoft Entra first-party application scope metadata.",
   "type": "module",
   "bin": {
