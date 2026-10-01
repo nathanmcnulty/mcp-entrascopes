@@ -39,7 +39,7 @@
   "homepage": "https://github.com/nathanmcnulty/mcp-entrascopes#readme",
   "license": "Unlicense",
   "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.2.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
