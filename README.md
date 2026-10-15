@@ -38,7 +38,7 @@ Historical comparison defaults to the latest two ROADtools commits that changed 
 
 ## Requirements
 
-- Node.js 20 or later
+- Node.js 24 or later
 - Network access to GitHub raw content when the cache is empty or refreshed
 - No Microsoft identity, Graph permission, secret, or tenant access
 
