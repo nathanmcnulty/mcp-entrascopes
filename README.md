@@ -103,6 +103,8 @@ npm run build
 npm pack --dry-run
 ```
 
+Tests use the existing TypeScript compiler to emit source and tests into `.test-dist`, then run the compiled tests with Node's built-in test runner. `npm test` clears this directory first; `npm run clean:test` removes it separately. The production build still emits only source into `dist`.
+
 The server uses the MCP TypeScript SDK v2 and stdio transport. Never write logs to stdout because stdout is the MCP protocol channel; operational messages go to stderr.
 
 ## Security

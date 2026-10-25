@@ -16,7 +16,8 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
-    "test": "tsx --test",
+    "clean:test": "node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\"",
+    "test": "npm run clean:test && tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
     "prepare": "npm run build"
   },
   "engines": {
@@ -39,13 +40,12 @@
   "homepage": "https://github.com/nathanmcnulty/mcp-entrascopes#readme",
   "license": "Unlicense",
   "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.3.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@types/node": "24.19.2",
-    "tsx": "4.23.15",
     "typescript": "7.0.2"
   }
 }
